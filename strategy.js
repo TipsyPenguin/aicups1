@@ -1,5 +1,5 @@
 let BaseStrategy = require('./basestrategy').BaseStrategy;
-let previousFloors = [1,1,1,1];
+// let previousFloors = [1,1,1,1];
 
 class Strategy extends BaseStrategy {
 
@@ -15,20 +15,19 @@ class Strategy extends BaseStrategy {
             });
             if (elevator.passengers.length > 0 && elevator.state !== 1) {
                 if (elevator.passengers.length > 19 || passengersOnFloor.length === 0) {
-                    let bestFloor = elevator.floor;
-                    let previousFloor = previousFloors[Math.floor((elevator.id-1) / 2)];
-                    if (previousFloor) {
-                        if ((previousFloor < elevator.floor && elevator.floor !== 9) || (elevator.floor === 1)) {
-                            bestFloor++;
-                        } else {
-                            bestFloor--;
-                        }
-                    }
-                    previousFloors[Math.floor((elevator.id-1) / 2)] = elevator.floor;
+                    let bestFloor = this.selectNextFloor(elevator);
                     elevator.goToFloor(bestFloor);
                 }
             }
         });
+    }
+
+    selectNextFloor(elevator) {
+        if (elevator.floor === 1) {
+            return 9;
+        } else {
+            return elevator.floor - 1;
+        };        
     }
 }
 
