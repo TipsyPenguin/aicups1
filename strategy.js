@@ -16,7 +16,7 @@ class Strategy extends BaseStrategy {
             if (elevator.passengers.length > 0 && elevator.state !== 1) {
                 if (elevator.passengers.length > 19 || passengersOnFloor.length === 0) {
                     let bestFloor = elevator.floor;
-                    let previousFloor = previousFloors[(elevator.id-1)%2];
+                    let previousFloor = previousFloors[Math.floor((elevator.id-1) / 2)];
                     if (previousFloor) {
                         if ((previousFloor < elevator.floor && elevator.floor !== 9) || (elevator.floor === 1)) {
                             bestFloor++;
@@ -24,7 +24,7 @@ class Strategy extends BaseStrategy {
                             bestFloor--;
                         }
                     }
-                    previousFloors[(elevator.id-1)%2] = elevator.floor;
+                    previousFloors[Math.floor((elevator.id-1) / 2)] = elevator.floor;
                     elevator.goToFloor(bestFloor);
                 }
             }
