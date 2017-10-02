@@ -29,59 +29,47 @@ class Strategy extends BaseStrategy {
     onTick(myPassengers, myElevators, enemyPassengers, enemyElevators) {
         let floorRating = Strategy.generateFloorRating(myPassengers, myElevators, enemyPassengers, enemyElevators);
         console.log(floorRating);
-        let goodPassengersStatuses = [1, 2, 3];
         myElevators.forEach(elevator => {
 
-            let passengersOnFloor = myPassengers.filter(function (passenger) {
-                return (passenger.fromFloor === elevator.floor && goodPassengersStatuses.indexOf(passenger.state) !== -1);
-            });
-            let enemyPassengersOnFloor = enemyPassengers.filter(function (passenger) {
-                return (passenger.fromFloor === elevator.floor && goodPassengersStatuses.indexOf(passenger.state) !== -1);
-            });
+            let passengersOnFloor = Strategy.getPassengersOnFloor(myPassengers, enemyPassengers, elevator);
 
-            passengersOnFloor.forEach(passenger => {
-                if (Strategy.selectElevator(elevator, passenger)) {
-                    passenger.setElevator(elevator);
-                }
-            });
-            enemyPassengersOnFloor.forEach(passenger => {
-                if (Strategy.selectElevator(elevator, passenger)) {
-                    passenger.setElevator(elevator);
-                }
-            });
-            try {
-                if (elevator.passengers.length > 0 && elevator.state !== 1) {
-                    if (elevator.passengers.length > 19 || passengersOnFloor.length === 0) {
-                        let bestFloor = Strategy.selectNextFloor(floorRating, elevator);
-                        // console.log('best floor', bestFloor);
-                        console.log(elevator.state, elevator.floor);
-                        elevator.goToFloor(bestFloor);
-                    }
-                    // } else {
-                    //     console.log('not best floor');
-                    // }
-                }
-            } catch (e) {
-                console.log(e);
+            let bestFloor = Strategy.selectNextFloor(floorRating, elevator, myElevators);
+
+            Strategy.selectElevator(elevator, passengersOnFloor);
+
+            if (Strategy.movementAllowed(passengersOnFloor, elevator, bestFloor)) {
+                elevator.goToFloor(bestFloor);
+                console.log(elevator.nextFloor);
             }
 
         });
     }
 
-    static selectElevator(elevator, passenger) {
-        return (elevators[elevator.id].indexOf(passenger.destFloor) !== -1);
+    static selectElevator(elevator, passengersOnFloor) {
+        passengersOnFloor.forEach(passenger => {
+            if ((elevators[elevator.id].indexOf(passenger.destFloor) !== -1) && (passenger.floor === 1)
+            || (passenger.floor > 1)) {
+                passenger.setElevator(elevator);
+            }
+        });
     }
 
 
-    static selectNextFloor(floorRating, currentElevator) {
+    static selectNextFloor(floorRating, currentElevator, myElevators) {
         let maxFloor = 1;
         let maxWeight = 0;
+        let badFloors = [];
+        myElevators.forEach(myElevator => {
+           if (myElevator.id !== currentElevator.id) {
+               badFloors.push(myElevator.nextFloor);
+           }
+        });
         console.log(floorRating);
         for (let key in floorRating[currentElevator.id]) {
-            if (floorRating[currentElevator.id][key] > maxWeight) {
+            if (floorRating[currentElevator.id][key] > maxWeight && badFloors.indexOf(key) === -1) {
                 maxFloor = key;
                 maxWeight = floorRating[currentElevator.id][key];
-                console.log('ff',maxFloor, maxWeight);
+                console.log('ff', currentElevator.id, maxFloor, maxWeight);
             }
         }
         return parseInt(maxFloor, 10);
@@ -97,11 +85,63 @@ class Strategy extends BaseStrategy {
             }
             myElevator.passengers.forEach(passengerInFloor => {
                 floorRating[myElevator.id][passengerInFloor.destFloor]++;
-                // if ()
             });
+            if (myElevator.passengers.length < 11) {
+                let floorTiming = Strategy.calculateFloorTiming(myPassengers, myElevator, enemyPassengers, enemyElevators);
+                for (let key in floorTiming) {
+                    if (floorTiming[key]) {
+                        floorRating[myElevator.id][key] = floorRating[myElevator.id][key] + floorTiming[key];
+                    }
+
+                }
+            }
         });
         console.log(floorRating);
         return floorRating;
+    }
+
+    static calculateFloorTiming(myPassengers, myElevator, enemyPassengers, enemyElevators) {
+        let floorsPassengersCount = [];
+        myPassengers.forEach(passenger => {
+            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * 50 + 100;
+            if (passenger.state < 4 && passenger.timeToAway > timeToFloor && myElevator.floor !== passenger.floor) {
+                if (!floorsPassengersCount[passenger.floor]) {
+                    floorsPassengersCount[passenger.floor] = 1;
+                } else {
+                    floorsPassengersCount[passenger.floor]++;
+                }
+
+            }
+        });
+        enemyPassengers.forEach(passenger => {
+            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * 50 + 100;
+            if (passenger.state < 4 && passenger.timeToAway > timeToFloor && myElevator.floor !== passenger.floor) {
+                floorsPassengersCount[myElevator.floor]++;
+            }
+        });
+        return floorsPassengersCount;
+    }
+
+    static movementAllowed(passengersOnFloor, elevator, bestFloor) {
+        let bestPassengersOnFloor = passengersOnFloor.filter(passenger => {
+            return (/*passenger.destFloor === bestFloor && */passenger.state < 4);
+        });
+        console.log('ma', elevator.id, bestPassengersOnFloor.length);
+        return ((elevator.state !== 1 && bestPassengersOnFloor.length === 0 && elevator.floor !== 1)
+        || (elevator.passengers.length > 19) || (passengersOnFloor.length === 0 && elevator.floor === 1));
+    }
+
+    static getPassengersOnFloor(myPassengers, enemyPassengers, elevator) {
+        let goodPassengersStatuses = [1, 2, 3];
+        let passengersOnFloor = myPassengers.filter(function (passenger) {
+            return (passenger.fromFloor === elevator.floor && goodPassengersStatuses.indexOf(passenger.state) !== -1);
+        });
+        let enemyPassengersOnFloor = enemyPassengers.filter(function (passenger) {
+            return (passenger.fromFloor === elevator.floor && goodPassengersStatuses.indexOf(passenger.state) !== -1);
+        });
+
+        return passengersOnFloor.concat(enemyPassengersOnFloor);
+
     }
 
 
