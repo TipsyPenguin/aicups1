@@ -1,17 +1,17 @@
 let BaseStrategy = require('./basestrategy').BaseStrategy;
 
-let elevators = {
-    1: [2, 3],
-    3: [4, 5],
-    5: [6, 7],
-    7: [8, 9],
-    2: [2, 3],
-    4: [4, 5],
-    6: [6, 7],
-    8: [8, 9],
+const elevators = {
+    7: [5,6,7,8,9],
+    5: [6,7,8,9],
+    3: [7,8,9],
+    1: [8,9],
+    2: [8,9],
+    4: [7,8,9],
+    6: [6,7,8,9],
+    8: [5,6,7,8,9],
 };
 
-let weightDiffFloors = {
+const weightDiffFloors = {
     '0': 0,
     '1': 8,
     '2': 7,
@@ -23,13 +23,23 @@ let weightDiffFloors = {
     '8': 1,
 };
 
+let futurePassengers = [];
+
+const prevTickElevators = [];
+
+let tikNumber = 0;
+
+let myType = '';
+
 class Strategy extends BaseStrategy {
 
 
     onTick(myPassengers, myElevators, enemyPassengers, enemyElevators) {
+        tikNumber++;
+        Strategy.setFuturePassengers(myElevators, enemyElevators);
         let floorRating = Strategy.generateFloorRating(myPassengers, myElevators, enemyPassengers, enemyElevators);
-        console.log(floorRating);
         myElevators.forEach(elevator => {
+            myType = elevator.type;
 
             let passengersOnFloor = Strategy.getPassengersOnFloor(myPassengers, enemyPassengers, elevator);
 
@@ -39,16 +49,17 @@ class Strategy extends BaseStrategy {
 
             if (Strategy.movementAllowed(passengersOnFloor, elevator, bestFloor)) {
                 elevator.goToFloor(bestFloor);
-                console.log(elevator.nextFloor);
             }
 
         });
+        Strategy.setPrevElevators(myElevators, enemyElevators);
     }
 
     static selectElevator(elevator, passengersOnFloor) {
         passengersOnFloor.forEach(passenger => {
             if ((elevators[elevator.id].indexOf(passenger.destFloor) !== -1) && (passenger.floor === 1)
-            || (passenger.floor > 1)) {
+            || (passenger.floor > 1)
+            || (passenger.type !== myType && passenger.floor === 1 && elevator.id > 6)) {
                 passenger.setElevator(elevator);
             }
         });
@@ -64,12 +75,10 @@ class Strategy extends BaseStrategy {
                badFloors.push(myElevator.nextFloor);
            }
         });
-        console.log(floorRating);
         for (let key in floorRating[currentElevator.id]) {
-            if (floorRating[currentElevator.id][key] > maxWeight && badFloors.indexOf(key) === -1) {
+            if (floorRating[currentElevator.id][key] > maxWeight && badFloors.indexOf(parseInt(key,10)) === -1) {
                 maxFloor = key;
                 maxWeight = floorRating[currentElevator.id][key];
-                console.log('ff', currentElevator.id, maxFloor, maxWeight);
             }
         }
         return parseInt(maxFloor, 10);
@@ -84,7 +93,7 @@ class Strategy extends BaseStrategy {
                 // floorRating[myElevator.id][i] = weightDiffFloors[Math.abs(myElevator.floor - i)];
             }
             myElevator.passengers.forEach(passengerInFloor => {
-                floorRating[myElevator.id][passengerInFloor.destFloor]++;
+                floorRating[myElevator.id][passengerInFloor.destFloor] += Math.abs(passengerInFloor.destFloor - passengerInFloor.fromFloor);
             });
             if (myElevator.passengers.length < 11) {
                 let floorTiming = Strategy.calculateFloorTiming(myPassengers, myElevator, enemyPassengers, enemyElevators);
@@ -96,29 +105,49 @@ class Strategy extends BaseStrategy {
                 }
             }
         });
-        console.log(floorRating);
         return floorRating;
     }
 
     static calculateFloorTiming(myPassengers, myElevator, enemyPassengers, enemyElevators) {
         let floorsPassengersCount = [];
+
         myPassengers.forEach(passenger => {
-            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * 50 + 100;
+            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * myElevator.speed + 100;
             if (passenger.state < 4 && passenger.timeToAway > timeToFloor && myElevator.floor !== passenger.floor) {
                 if (!floorsPassengersCount[passenger.floor]) {
-                    floorsPassengersCount[passenger.floor] = 1;
+                    floorsPassengersCount[passenger.floor] = Math.abs(passenger.floor - passenger.destFloor);
                 } else {
-                    floorsPassengersCount[passenger.floor]++;
+                    floorsPassengersCount[passenger.floor] += Math.abs(passenger.floor - passenger.destFloor);
                 }
 
             }
         });
         enemyPassengers.forEach(passenger => {
-            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * 50 + 100;
+            let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * myElevator.speed + 100;
             if (passenger.state < 4 && passenger.timeToAway > timeToFloor && myElevator.floor !== passenger.floor) {
+                if (!floorsPassengersCount[myElevator.floor]) {
+                    floorsPassengersCount[myElevator.floor] = 0;
+                }
                 floorsPassengersCount[myElevator.floor]++;
             }
         });
+
+        for (let key in floorsPassengersCount) {
+            let futurePassengersOnFloor = futurePassengers.filter(passenger => {
+                return passenger.floor == key;
+            });
+            futurePassengersOnFloor.forEach(passenger => {
+                let timeToFloor = Math.abs(myElevator.floor - passenger.floor) * myElevator.speed + 100;
+                if (passenger.time < timeToFloor) {
+                    if (!floorsPassengersCount[key]) {
+                        floorsPassengersCount[key] = 0;
+                    }
+                    floorsPassengersCount[key] += passenger.count;
+                }
+            })
+        }
+        console.log(floorsPassengersCount);
+
         return floorsPassengersCount;
     }
 
@@ -126,7 +155,6 @@ class Strategy extends BaseStrategy {
         let bestPassengersOnFloor = passengersOnFloor.filter(passenger => {
             return (/*passenger.destFloor === bestFloor && */passenger.state < 4);
         });
-        console.log('ma', elevator.id, bestPassengersOnFloor.length);
         return ((elevator.state !== 1 && bestPassengersOnFloor.length === 0 && elevator.floor !== 1)
         || (elevator.passengers.length > 19) || (passengersOnFloor.length === 0 && elevator.floor === 1));
     }
@@ -142,6 +170,41 @@ class Strategy extends BaseStrategy {
 
         return passengersOnFloor.concat(enemyPassengersOnFloor);
 
+    }
+
+    static setPrevElevators(myElevators, enemyElevators) {
+        myElevators.forEach(myElevator => {
+            prevTickElevators[myElevator.id] = myElevator;
+        });
+        enemyElevators.forEach(enemyElevator => {
+            prevTickElevators[enemyElevator.id] = enemyElevator;
+        })
+    }
+
+    static setFuturePassengers(myElevators, enemyElevators) {
+        let newFuturePassengers = [];
+        futurePassengers.forEach(passengers => {
+            if (passengers) {
+                passengers.time--;
+            }
+            if (passengers.time) {
+                newFuturePassengers.push(passengers);
+            }
+        });
+        futurePassengers = newFuturePassengers;
+
+        if (prevTickElevators.length > 0) {
+            let allElevators = myElevators.concat(enemyElevators);
+            allElevators.forEach(elevator => {
+                if (elevator.passengers.length < prevTickElevators[elevator.id].passengers.length) {
+                    futurePassengers.push({
+                        count: prevTickElevators[elevator.id].passengers.length - elevator.passengers.length,
+                        floor: prevTickElevators[elevator.id].floor,
+                        time: 500,
+                    })
+                }
+            })
+        }
     }
 
 
