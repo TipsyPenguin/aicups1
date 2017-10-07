@@ -1,14 +1,14 @@
 let BaseStrategy = require('./basestrategy').BaseStrategy;
 
 const elevators = {
-    7: [5,6,7,8,9],
-    5: [6,7,8,9],
-    3: [7,8,9],
-    1: [8,9],
-    2: [8,9],
-    4: [7,8,9],
-    6: [6,7,8,9],
-    8: [5,6,7,8,9],
+    7: [5, 6, 7, 8, 9],
+    5: [6, 7, 8, 9],
+    3: [7, 8, 9],
+    1: [8, 9],
+    2: [8, 9],
+    4: [7, 8, 9],
+    6: [6, 7, 8, 9],
+    8: [5, 6, 7, 8, 9],
 };
 
 const weightDiffFloors = {
@@ -58,8 +58,8 @@ class Strategy extends BaseStrategy {
     static selectElevator(elevator, passengersOnFloor) {
         passengersOnFloor.forEach(passenger => {
             if ((elevators[elevator.id].indexOf(passenger.destFloor) !== -1) && (passenger.floor === 1)
-            || (passenger.floor > 1)
-            || (passenger.type !== myType && passenger.floor === 1 && elevator.id > 6)) {
+                || (passenger.floor > 1)
+                || (passenger.type !== myType && passenger.floor === 1 && elevator.id > 6)) {
                 passenger.setElevator(elevator);
             }
         });
@@ -71,12 +71,12 @@ class Strategy extends BaseStrategy {
         let maxWeight = 0;
         let badFloors = [];
         myElevators.forEach(myElevator => {
-           if (myElevator.id !== currentElevator.id) {
-               badFloors.push(myElevator.nextFloor);
-           }
+            if (myElevator.id !== currentElevator.id) {
+                badFloors.push(myElevator.nextFloor);
+            }
         });
         for (let key in floorRating[currentElevator.id]) {
-            if (floorRating[currentElevator.id][key] > maxWeight && badFloors.indexOf(parseInt(key,10)) === -1) {
+            if (floorRating[currentElevator.id][key] > maxWeight && badFloors.indexOf(parseInt(key, 10)) === -1) {
                 maxFloor = key;
                 maxWeight = floorRating[currentElevator.id][key];
             }
@@ -155,7 +155,13 @@ class Strategy extends BaseStrategy {
         let bestPassengersOnFloor = passengersOnFloor.filter(passenger => {
             return (/*passenger.destFloor === bestFloor && */passenger.state < 4);
         });
-        return ((elevator.state !== 1 && bestPassengersOnFloor.length === 0 && elevator.floor !== 1)
+        let futurePassengersOnFloor = futurePassengers.filter(passenger => {
+            return (passenger.floor === elevator.floor && passenger.time < 100)
+        });
+        let passengerInElevatorForCurrentFloor = Strategy.checkPassengersInElevator(elevator);
+        return ((futurePassengersOnFloor.length === 0 &&
+        passengerInElevatorForCurrentFloor &&
+        elevator.state !== 1 && bestPassengersOnFloor.length === 0 && elevator.floor !== 1)
         || (elevator.passengers.length > 19) || (passengersOnFloor.length === 0 && elevator.floor === 1));
     }
 
@@ -205,6 +211,14 @@ class Strategy extends BaseStrategy {
                 }
             })
         }
+    }
+
+    static checkPassengersInElevator(elevator) {
+        let passengersOnFloor = elevator.passengers.filter(passenger => {
+            return passenger.destFloor === elevator.floor;
+        });
+        return !!passengersOnFloor.length;
+
     }
 
 
